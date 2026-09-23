@@ -1,0 +1,16 @@
+order_id,customer_id,order_date,status,payment_method
+90001,1001,2025-03-15,completed,credit_card
+90002,1002,2025-03-16,completed,paypal
+90003,1003,2025-03-17,completed,credit_card
+90004,1001,2025-03-18,completed,credit_card
+90005,1004,2025-03-19,cancelled,credit_card
+90006,1005,2025-03-20,completed,debit_card
+90007,1006,2025-03-21,completed,paypal
+90008,1007,2025-03-22,completed,credit_card
+90009,1008,2025-03-23,completed,debit_card
+90010,1009,2025-03-24,completed,credit_card
+90011,1010,2025-03-25,completed,paypal
+90012,1003,2025-03-26,completed,credit_card
+90013,1005,2025-03-27,completed,debit_card
+90014,1001,2025-03-28,completed,credit_card
+90015,1007,2025-03-29,completed,credit_card

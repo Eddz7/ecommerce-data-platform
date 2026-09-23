@@ -11,8 +11,7 @@ env/
 # Environment variables
 .env
 
-# Data files
-data/raw/
+# Generated data
 data/processed/
 
 # IDE
