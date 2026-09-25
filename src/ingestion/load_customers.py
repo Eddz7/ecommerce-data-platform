@@ -21,40 +21,45 @@ connection = psycopg.connect(
 with open("data/raw/customers.csv", newline="") as file:
     reader = csv.DictReader(file)
 
-    with connection.cursor() as cursor:
-        for row in reader:
-            customer_id = int(row["customer_id"])
+    try:
+        with connection.cursor() as cursor:
+            for row in reader:
+                customer_id = int(row["customer_id"])
 
-            signup_date = datetime.strptime(
-                row["signup_date"],
-                "%Y-%m-%d"
-            ).date()
+                signup_date = datetime.strptime(
+                    row["signup_date"],
+                    "%Y-%m-%d"
+                ).date()
 
-            cursor.execute(
-                """
-                INSERT INTO customers (
-                    customer_id,
-                    first_name,
-                    last_name,
-                    email,
-                    country,
-                    signup_date
+                cursor.execute(
+                    """
+                    INSERT INTO customers (
+                        customer_id,
+                        first_name,
+                        last_name,
+                        email,
+                        country,
+                        signup_date
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (customer_id) DO NOTHING
+                    """,
+                    (
+                        customer_id,
+                        row["first_name"],
+                        row["last_name"],
+                        row["email"],
+                        row["country"],
+                        signup_date,
+                    ),
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (customer_id) DO NOTHING
-                """,
-                (
-                    customer_id,
-                    row["first_name"],
-                    row["last_name"],
-                    row["email"],
-                    row["country"],
-                    signup_date,
-                ),
-            )
-
-
-connection.commit()
-connection.close()
+        connection.commit()
+    
+    except Exception:
+        connection.rollback()
+        raise
+    
+    finally:
+        connection.close()
 
 print("Customers inserted successfully!")
