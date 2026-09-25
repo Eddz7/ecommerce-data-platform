@@ -1,13 +1,20 @@
 import csv
 import os
+import logging
 from datetime import datetime
 
 import psycopg
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+logger.info("Starting customer ingestion")
 
 connection = psycopg.connect(
     host=os.getenv("DB_HOST"),
@@ -23,6 +30,7 @@ with open("data/raw/customers.csv", newline="") as file:
 
     try:
         with connection.cursor() as cursor:
+            records_processed = 0
             for row in reader:
                 customer_id = int(row["customer_id"])
 
@@ -53,6 +61,7 @@ with open("data/raw/customers.csv", newline="") as file:
                         signup_date,
                     ),
                 )
+                records_processed += 1
         connection.commit()
     
     except Exception:
@@ -62,4 +71,7 @@ with open("data/raw/customers.csv", newline="") as file:
     finally:
         connection.close()
 
-print("Customers inserted successfully!")
+logger.info(
+    "Customers ingestion completed: %s records processed",
+    records_processed,
+)
