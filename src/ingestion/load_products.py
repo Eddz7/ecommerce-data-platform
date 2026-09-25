@@ -1,5 +1,6 @@
 import csv
 import os
+import logging
 from datetime import datetime
 
 import psycopg
@@ -9,6 +10,13 @@ from decimal import Decimal
 
 load_dotenv()
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+logger.info("Starting product ingestion")
 
 connection = psycopg.connect(
     host=os.getenv("DB_HOST"),
@@ -24,6 +32,7 @@ with open("data/raw/products.csv", newline="") as file:
 
     try:
         with connection.cursor() as cursor:
+            records_processed = 0
             for row in reader:
                 product_id = int(row["product_id"])
                 unit_price = Decimal(row["unit_price"])
@@ -46,6 +55,7 @@ with open("data/raw/products.csv", newline="") as file:
                         unit_price,
                     ),
                 )
+                records_processed += 1
         connection.commit()
     
     except Exception:
@@ -55,4 +65,7 @@ with open("data/raw/products.csv", newline="") as file:
     finally:
         connection.close()
 
-print("Products inserted successfully!")
+logger.info(
+    "Products ingestion completed: %s records processed",
+    records_processed,
+)
