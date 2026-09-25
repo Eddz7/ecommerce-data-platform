@@ -39,6 +39,7 @@ with open("data/raw/orders.csv", newline="") as file:
                     payment_method
                 )
                 VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (order_id) DO NOTHING
                 """,
                 (
                     order_id,

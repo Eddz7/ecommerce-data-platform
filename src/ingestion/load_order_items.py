@@ -35,6 +35,7 @@ with open("data/raw/order_items.csv", newline="") as file:
                     unit_price
                 )
                 VALUES (%s, %s, %s, %s)
+                ON CONFLICT (order_id, product_id) DO NOTHING
                 """,
                 (
                     order_id,

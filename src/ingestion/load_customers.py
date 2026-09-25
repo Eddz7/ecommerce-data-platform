@@ -41,6 +41,7 @@ with open("data/raw/customers.csv", newline="") as file:
                     signup_date
                 )
                 VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (customer_id) DO NOTHING
                 """,
                 (
                     customer_id,
