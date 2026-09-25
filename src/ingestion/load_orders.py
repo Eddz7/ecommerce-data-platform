@@ -19,38 +19,44 @@ connection = psycopg.connect(
 
 with open("data/raw/orders.csv", newline="") as file:
     reader = csv.DictReader(file)
+    
+    try:
+        with connection.cursor() as cursor:
+            for row in reader:
+                order_id = int(row["order_id"])
+                customer_id = int(row["customer_id"])
+                order_date = datetime.strptime(
+                    row["order_date"],
+                    "%Y-%m-%d"
+                ).date()
 
-    with connection.cursor() as cursor:
-        for row in reader:
-            order_id = int(row["order_id"])
-            customer_id = int(row["customer_id"])
-            order_date = datetime.strptime(
-                row["order_date"],
-                "%Y-%m-%d"
-            ).date()
-
-            cursor.execute(
-                """
-                INSERT INTO orders (
-                    order_id,
-                    customer_id,
-                    order_date,
-                    status,
-                    payment_method
+                cursor.execute(
+                    """
+                    INSERT INTO orders (
+                        order_id,
+                        customer_id,
+                        order_date,
+                        status,
+                        payment_method
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (order_id) DO NOTHING
+                    """,
+                    (
+                        order_id,
+                        customer_id,
+                        order_date,
+                        row["status"],
+                        row["payment_method"],
+                    ),
                 )
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (order_id) DO NOTHING
-                """,
-                (
-                    order_id,
-                    customer_id,
-                    order_date,
-                    row["status"],
-                    row["payment_method"],
-                ),
-            )
+        connection.commit()
+    
+    except Exception:
+        connection.rollback()
+        raise
 
-connection.commit()
-connection.close()
+    finally:
+        connection.close()
 
 print("Orders inserted successfully!")

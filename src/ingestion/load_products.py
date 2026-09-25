@@ -22,31 +22,37 @@ connection = psycopg.connect(
 with open("data/raw/products.csv", newline="") as file:
     reader = csv.DictReader(file)
 
-    with connection.cursor() as cursor:
-        for row in reader:
-            product_id = int(row["product_id"])
-            unit_price = Decimal(row["unit_price"])
+    try:
+        with connection.cursor() as cursor:
+            for row in reader:
+                product_id = int(row["product_id"])
+                unit_price = Decimal(row["unit_price"])
 
-            cursor.execute(
-                """
-                INSERT INTO products (
-                    product_id,
-                    product_name,
-                    category,
-                    unit_price
+                cursor.execute(
+                    """
+                    INSERT INTO products (
+                        product_id,
+                        product_name,
+                        category,
+                        unit_price
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (product_id) DO NOTHING
+                    """,
+                    (
+                        product_id,
+                        row["product_name"],
+                        row["category"],
+                        unit_price,
+                    ),
                 )
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (product_id) DO NOTHING
-                """,
-                (
-                    product_id,
-                    row["product_name"],
-                    row["category"],
-                    unit_price,
-                ),
-            )
-
-connection.commit()
-connection.close()
+        connection.commit()
+    
+    except Exception:
+        connection.rollback()
+        raise
+    
+    finally:
+        connection.close()
 
 print("Products inserted successfully!")
