@@ -4,7 +4,7 @@ import logging
 
 import psycopg
 from dotenv import load_dotenv
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 
 load_dotenv()
@@ -40,7 +40,7 @@ def validate_product(row):
 
     try:
         unit_price = Decimal(row["unit_price"])
-    except Exception:
+    except InvalidOperation:
         raise ValueError(
             f"Invalid unit_price: {row['unit_price']}"
         )
@@ -58,9 +58,22 @@ connection = psycopg.connect(
     password=os.getenv("DB_PASSWORD"),
 )
 
+EXPECTED_COLUMNS = {
+    "product_id",
+    "product_name",
+    "category",
+    "unit_price",
+}
+
 
 with open("data/raw/products.csv", newline="") as file:
     reader = csv.DictReader(file)
+    missing_columns = EXPECTED_COLUMNS - set(reader.fieldnames or [])
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing required columns: {sorted(missing_columns)}"
+        )
 
     try:
         with connection.cursor() as cursor:
@@ -78,26 +91,31 @@ with open("data/raw/products.csv", newline="") as file:
                     continue
                 product_id = int(row["product_id"])
                 unit_price = Decimal(row["unit_price"])
-
-                cursor.execute(
-                    """
-                    INSERT INTO products (
-                        product_id,
-                        product_name,
-                        category,
-                        unit_price
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO products (
+                            product_id,
+                            product_name,
+                            category,
+                            unit_price
+                        )
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (product_id) DO NOTHING
+                        """,
+                        (
+                            product_id,
+                            row["product_name"],
+                            row["category"],
+                            unit_price,
+                        ),
                     )
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (product_id) DO NOTHING
-                    """,
-                    (
-                        product_id,
-                        row["product_name"],
-                        row["category"],
-                        unit_price,
-                    ),
-                )
-
+                except psycopg.Error:
+                    logger.exception(
+                        "Database error inserting product: product_id=%s",
+                        product_id
+                    )
+                    raise
                 if cursor.rowcount == 1:
                     records_inserted += 1
                 else:

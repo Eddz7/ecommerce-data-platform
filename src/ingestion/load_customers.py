@@ -57,9 +57,23 @@ connection = psycopg.connect(
     password=os.getenv("DB_PASSWORD"),
 )
 
+EXPECTED_COLUMNS = {
+    "customer_id",
+    "first_name",
+    "last_name",
+    "email",
+    "country",
+    "signup_date",
+}
 
 with open("data/raw/customers.csv", newline="") as file:
     reader = csv.DictReader(file)
+    missing_columns = EXPECTED_COLUMNS - set(reader.fieldnames or [])
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing required columns: {sorted(missing_columns)}"
+        )
 
     try:
         with connection.cursor() as cursor:
@@ -81,28 +95,35 @@ with open("data/raw/customers.csv", newline="") as file:
                     "%Y-%m-%d"
                 ).date()
 
-                cursor.execute(
-                    """
-                    INSERT INTO customers (
-                        customer_id,
-                        first_name,
-                        last_name,
-                        email,
-                        country,
-                        signup_date
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO customers (
+                            customer_id,
+                            first_name,
+                            last_name,
+                            email,
+                            country,
+                            signup_date
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (customer_id) DO NOTHING
+                        """,
+                        (
+                            customer_id,
+                            row["first_name"],
+                            row["last_name"],
+                            row["email"],
+                            row["country"],
+                            signup_date,
+                        ),
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (customer_id) DO NOTHING
-                    """,
-                    (
-                        customer_id,
-                        row["first_name"],
-                        row["last_name"],
-                        row["email"],
-                        row["country"],
-                        signup_date,
-                    ),
-                )
+                except psycopg.Error:
+                    logger.exception(
+                        "Database error inserting customer: customer_id=%s",
+                        customer_id
+                    )
+                    raise
 
                 if cursor.rowcount == 1:
                     records_inserted += 1

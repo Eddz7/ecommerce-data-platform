@@ -82,9 +82,23 @@ connection = psycopg.connect(
     password=os.getenv("DB_PASSWORD"),
 )
 
+EXPECTED_COLUMNS = {
+    "order_id",
+    "customer_id",
+    "order_date",
+    "status",
+    "payment_method",
+}
+
+
 with open("data/raw/orders.csv", newline="") as file:
     reader = csv.DictReader(file)
+    missing_columns = EXPECTED_COLUMNS - set(reader.fieldnames or [])
 
+    if missing_columns:
+        raise ValueError(
+            f"Missing required columns: {sorted(missing_columns)}"
+        )
     try:
         with connection.cursor() as cursor:
             records_processed = 0
@@ -106,26 +120,34 @@ with open("data/raw/orders.csv", newline="") as file:
                     "%Y-%m-%d"
                 ).date()
 
-                cursor.execute(
-                    """
-                    INSERT INTO orders (
-                        order_id,
-                        customer_id,
-                        order_date,
-                        status,
-                        payment_method
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO orders (
+                            order_id,
+                            customer_id,
+                            order_date,
+                            status,
+                            payment_method
+                        )
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (order_id) DO NOTHING
+                        """,
+                        (
+                            order_id,
+                            customer_id,
+                            order_date,
+                            row["status"],
+                            row["payment_method"],
+                        ),
                     )
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (order_id) DO NOTHING
-                    """,
-                    (
+                except psycopg.Error:
+                    logger.exception(
+                        "Database error inserting order: order_id=%s, customer_id=%s",
                         order_id,
                         customer_id,
-                        order_date,
-                        row["status"],
-                        row["payment_method"],
-                    ),
-                )
+                    )
+                    raise
 
                 if cursor.rowcount == 1:
                     records_inserted += 1
