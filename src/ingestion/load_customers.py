@@ -5,6 +5,8 @@ from datetime import datetime
 
 import psycopg
 from dotenv import load_dotenv
+from src.ingestion.validation import validate_columns
+
 
 load_dotenv()
 
@@ -14,7 +16,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-logger.info("Starting customer ingestion")
+
+EXPECTED_COLUMNS = {
+    "customer_id",
+    "first_name",
+    "last_name",
+    "email",
+    "country",
+    "signup_date",
+}
+
 
 def validate_customer(row):
     required_fields = [
@@ -49,99 +60,104 @@ def validate_customer(row):
             f"Invalid signup_date: {row['signup_date']}"
         )
 
-connection = psycopg.connect(
-    host=os.getenv("DB_HOST"),
-    port=os.getenv("DB_PORT"),
-    dbname=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-)
 
-EXPECTED_COLUMNS = {
-    "customer_id",
-    "first_name",
-    "last_name",
-    "email",
-    "country",
-    "signup_date",
-}
+def main():
+    logger.info("Starting customer ingestion")
 
-with open("data/raw/customers.csv", newline="") as file:
-    reader = csv.DictReader(file)
-    missing_columns = EXPECTED_COLUMNS - set(reader.fieldnames or [])
+    connection = psycopg.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+    )
 
-    if missing_columns:
-        raise ValueError(
-            f"Missing required columns: {sorted(missing_columns)}"
-        )
+    with open("data/raw/customers.csv", newline="") as file:
+        reader = csv.DictReader(file)
+        validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
 
-    try:
-        with connection.cursor() as cursor:
-            records_processed = 0
-            records_inserted = 0
-            records_skipped = 0
-            records_rejected = 0
-            for row in reader:
-                records_processed += 1
-                try:
-                    validate_customer(row)
-                except ValueError as error:
-                    records_rejected += 1
-                    logger.error("Rejected customer record: %s", error)
-                    continue
-                customer_id = int(row["customer_id"])
-                signup_date = datetime.strptime(
-                    row["signup_date"],
-                    "%Y-%m-%d"
-                ).date()
+        try:
+            with connection.cursor() as cursor:
+                records_processed = 0
+                records_inserted = 0
+                records_skipped = 0
+                records_rejected = 0
 
-                try:
-                    cursor.execute(
-                        """
-                        INSERT INTO customers (
-                            customer_id,
-                            first_name,
-                            last_name,
-                            email,
-                            country,
-                            signup_date
+                for row in reader:
+                    records_processed += 1
+
+                    try:
+                        validate_customer(row)
+                    except ValueError as error:
+                        records_rejected += 1
+                        logger.error(
+                            "Rejected customer record: %s",
+                            error,
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (customer_id) DO NOTHING
-                        """,
-                        (
+                        continue
+
+                    customer_id = int(row["customer_id"])
+                    signup_date = datetime.strptime(
+                        row["signup_date"],
+                        "%Y-%m-%d"
+                    ).date()
+
+                    try:
+                        cursor.execute(
+                            """
+                            INSERT INTO customers (
+                                customer_id,
+                                first_name,
+                                last_name,
+                                email,
+                                country,
+                                signup_date
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (customer_id) DO NOTHING
+                            """,
+                            (
+                                customer_id,
+                                row["first_name"],
+                                row["last_name"],
+                                row["email"],
+                                row["country"],
+                                signup_date,
+                            ),
+                        )
+                    except psycopg.Error:
+                        logger.exception(
+                            "Database error inserting customer: customer_id=%s",
                             customer_id,
-                            row["first_name"],
-                            row["last_name"],
-                            row["email"],
-                            row["country"],
-                            signup_date,
-                        ),
-                    )
-                except psycopg.Error:
-                    logger.exception(
-                        "Database error inserting customer: customer_id=%s",
-                        customer_id
-                    )
-                    raise
+                        )
+                        raise
 
-                if cursor.rowcount == 1:
-                    records_inserted += 1
-                else:
-                    records_skipped += 1
-        connection.commit()
+                    if cursor.rowcount == 1:
+                        records_inserted += 1
+                    else:
+                        records_skipped += 1
 
-    except Exception:
-        connection.rollback()
-        raise
+            connection.commit()
 
-    finally:
-        connection.close()
+        except Exception:
+            connection.rollback()
+            raise
 
-logger.info(
-    "Customers ingestion completed:\n%s records processed\n%s records inserted\n%s records skipped\n%s records rejected",
-    records_processed,
-    records_inserted,
-    records_skipped,
-    records_rejected,
-)
+        finally:
+            connection.close()
+
+    logger.info(
+        "Customers ingestion completed:\n"
+        "%s records processed\n"
+        "%s records inserted\n"
+        "%s records skipped\n"
+        "%s records rejected",
+        records_processed,
+        records_inserted,
+        records_skipped,
+        records_rejected,
+    )
+
+
+if __name__ == "__main__":
+    main()

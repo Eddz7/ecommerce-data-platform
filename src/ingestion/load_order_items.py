@@ -5,6 +5,7 @@ import logging
 import psycopg
 from dotenv import load_dotenv
 from decimal import Decimal, InvalidOperation
+from src.ingestion.validation import validate_columns
 
 
 load_dotenv()
@@ -86,12 +87,8 @@ EXPECTED_COLUMNS = {
 
 with open("data/raw/order_items.csv", newline="") as file:
     reader = csv.DictReader(file)
-    missing_columns = EXPECTED_COLUMNS - set(reader.fieldnames or [])
-
-    if missing_columns:
-        raise ValueError(
-            f"Missing required columns: {sorted(missing_columns)}"
-        )
+    validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
+    
     try:
         with connection.cursor() as cursor:
             records_processed = 0
