@@ -28,7 +28,8 @@ def validate_order_item(row):
     ]
 
     for field in required_fields:
-        if not row[field].strip():
+        value = row.get(field)
+        if value is None or not value.strip():
             raise ValueError(
                 f"Missing required field: {field}"
             )

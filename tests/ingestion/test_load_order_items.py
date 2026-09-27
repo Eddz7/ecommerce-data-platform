@@ -90,3 +90,19 @@ def test_validate_order_item_rejects_negative_unit_price():
         match=r"unit_price cannot be negative -10\.00",
     ):
         validate_order_item(row)
+
+
+def test_validate_order_item_rejects_none_field():
+    row = valid_order_item()
+    row["product_id"] = None
+
+    with pytest.raises(ValueError, match="Missing required field: product_id"):
+        validate_order_item(row)
+
+
+def test_validate_order_item_rejects_whitespace_only_field():
+    row = valid_order_item()
+    row["product_id"] = "   "
+
+    with pytest.raises(ValueError, match="Missing required field: product_id"):
+        validate_order_item(row)

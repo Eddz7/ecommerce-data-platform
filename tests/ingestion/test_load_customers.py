@@ -40,3 +40,18 @@ def test_validate_customer_rejects_invalid_signup_date():
 
     with pytest.raises(ValueError, match="Invalid signup_date: 15-01-2026"):
         validate_customer(row)
+
+
+def test_validate_customer_rejects_none_field():
+    row = valid_customer()
+    row["email"] = None
+
+    with pytest.raises(ValueError, match="Missing required field: email"):
+        validate_customer(row)
+
+def test_validate_customer_rejects_whitespace_only_field():
+    row = valid_customer()
+    row["email"] = "   "
+
+    with pytest.raises(ValueError, match="Missing required field: email"):
+        validate_customer(row)

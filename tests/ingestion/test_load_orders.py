@@ -66,3 +66,19 @@ def test_validate_order_rejects_invalid_payment_method():
         match="Invalid payment_method: cash",
     ):
         validate_order(row)
+
+
+def test_validate_order_rejects_none_field():
+    row = valid_order()
+    row["status"] = None
+
+    with pytest.raises(ValueError, match="Missing required field: status"):
+        validate_order(row)
+
+
+def test_validate_order_rejects_whitespace_only_field():
+    row = valid_order()
+    row["status"] = "   "
+
+    with pytest.raises(ValueError, match="Missing required field: status"):
+        validate_order(row)

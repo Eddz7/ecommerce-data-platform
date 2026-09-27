@@ -49,3 +49,19 @@ def test_validate_product_rejects_negative_unit_price():
         match=r"unit_price cannot be negative: -10\.00",
     ):
         validate_product(row)
+
+
+def test_validate_product_rejects_none_field():
+    row = valid_product()
+    row["product_name"] = None
+
+    with pytest.raises(ValueError, match="Missing required field: product_name"):
+        validate_product(row)
+
+
+def test_validate_product_rejects_whitespace_only_field():
+    row = valid_product()
+    row["product_name"] = "   "
+
+    with pytest.raises(ValueError, match="Missing required field: product_name"):
+        validate_product(row)
