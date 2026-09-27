@@ -1,5 +1,6 @@
 import pytest
 
+from src.ingestion import load_orders
 from src.ingestion.load_orders import validate_order
 
 
@@ -82,3 +83,14 @@ def test_validate_order_rejects_whitespace_only_field():
 
     with pytest.raises(ValueError, match="Missing required field: status"):
         validate_order(row)
+
+
+def test_main_closes_connection_when_columns_are_invalid(
+    bad_header_csv, fake_connection, monkeypatch
+):
+    monkeypatch.setattr(load_orders, "get_connection", lambda: fake_connection)
+
+    with pytest.raises(ValueError, match="Missing required columns"):
+        load_orders.main()
+
+    assert fake_connection.closed

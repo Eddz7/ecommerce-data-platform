@@ -63,11 +63,11 @@ def main():
 
     connection = get_connection()
 
-    with open("data/raw/customers.csv", newline="") as file:
-        reader = csv.DictReader(file)
-        validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
+    try:
+        with open("data/raw/customers.csv", newline="") as file:
+            reader = csv.DictReader(file)
+            validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
 
-        try:
             with connection.cursor() as cursor:
                 records_processed = 0
                 records_inserted = 0
@@ -130,12 +130,12 @@ def main():
 
             connection.commit()
 
-        except Exception:
-            connection.rollback()
-            raise
+    except Exception:
+        connection.rollback()
+        raise
 
-        finally:
-            connection.close()
+    finally:
+        connection.close()
 
     logger.info(
         "Customers ingestion completed:\n"

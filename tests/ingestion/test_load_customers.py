@@ -1,5 +1,6 @@
 import pytest
 
+from src.ingestion import load_customers
 from src.ingestion.load_customers import validate_customer
 
 
@@ -55,3 +56,14 @@ def test_validate_customer_rejects_whitespace_only_field():
 
     with pytest.raises(ValueError, match="Missing required field: email"):
         validate_customer(row)
+
+
+def test_main_closes_connection_when_columns_are_invalid(
+    bad_header_csv, fake_connection, monkeypatch
+):
+    monkeypatch.setattr(load_customers, "get_connection", lambda: fake_connection)
+
+    with pytest.raises(ValueError, match="Missing required columns"):
+        load_customers.main()
+
+    assert fake_connection.closed

@@ -84,11 +84,11 @@ def main():
 
     connection = get_connection()
 
-    with open("data/raw/orders.csv", newline="") as file:
-        reader = csv.DictReader(file)
-        validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
+    try:
+        with open("data/raw/orders.csv", newline="") as file:
+            reader = csv.DictReader(file)
+            validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
 
-        try:
             with connection.cursor() as cursor:
                 records_processed = 0
                 records_inserted = 0
@@ -144,12 +144,12 @@ def main():
                         records_skipped += 1
             connection.commit()
 
-        except Exception:
-            connection.rollback()
-            raise
+    except Exception:
+        connection.rollback()
+        raise
 
-        finally:
-            connection.close()
+    finally:
+        connection.close()
 
     logger.info(
         "Orders ingestion completed:\n%s records processed\n%s records inserted\n%s records skipped\n%s records rejected",

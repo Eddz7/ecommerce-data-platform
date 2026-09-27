@@ -1,5 +1,6 @@
 import pytest
 
+from src.ingestion import load_products
 from src.ingestion.load_products import validate_product
 
 
@@ -65,3 +66,14 @@ def test_validate_product_rejects_whitespace_only_field():
 
     with pytest.raises(ValueError, match="Missing required field: product_name"):
         validate_product(row)
+
+
+def test_main_closes_connection_when_columns_are_invalid(
+    bad_header_csv, fake_connection, monkeypatch
+):
+    monkeypatch.setattr(load_products, "get_connection", lambda: fake_connection)
+
+    with pytest.raises(ValueError, match="Missing required columns"):
+        load_products.main()
+
+    assert fake_connection.closed
