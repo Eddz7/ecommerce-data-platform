@@ -1,11 +1,11 @@
 import csv
-import os
 import logging
 from datetime import datetime
 
 import psycopg
 from dotenv import load_dotenv
 from src.ingestion.validation import validate_columns
+from src.ingestion.database import get_connection
 
 
 load_dotenv()
@@ -64,13 +64,7 @@ def validate_customer(row):
 def main():
     logger.info("Starting customer ingestion")
 
-    connection = psycopg.connect(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-    )
+    connection = get_connection()
 
     with open("data/raw/customers.csv", newline="") as file:
         reader = csv.DictReader(file)

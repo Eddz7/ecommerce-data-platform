@@ -1,11 +1,11 @@
 import csv
-import os
 import logging
 
 import psycopg
 from dotenv import load_dotenv
 from decimal import Decimal, InvalidOperation
 from src.ingestion.validation import validate_columns
+from src.ingestion.database import get_connection
 
 
 load_dotenv()
@@ -16,7 +16,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-logger.info("Starting order_item ingestion")
+EXPECTED_COLUMNS = {
+    "order_id",
+    "product_id",
+    "quantity",
+    "unit_price",
+}
 
 def validate_order_item(row):
     required_fields = [
@@ -69,88 +74,80 @@ def validate_order_item(row):
             f"unit_price cannot be negative {unit_price}"
         )
 
-connection = psycopg.connect(
-    host=os.getenv("DB_HOST"),
-    port=os.getenv("DB_PORT"),
-    dbname=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-)
+def main():
+    logger.info("Starting order_item ingestion")
 
-EXPECTED_COLUMNS = {
-    "order_id",
-    "product_id",
-    "quantity",
-    "unit_price",
-}
+    connection = get_connection()
 
+    with open("data/raw/order_items.csv", newline="") as file:
+        reader = csv.DictReader(file)
+        validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
 
-with open("data/raw/order_items.csv", newline="") as file:
-    reader = csv.DictReader(file)
-    validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
-    
-    try:
-        with connection.cursor() as cursor:
-            records_processed = 0
-            records_inserted = 0
-            records_skipped = 0
-            records_rejected = 0
-            for row in reader:
-                records_processed += 1
-                try:
-                    validate_order_item(row)
-                except ValueError as error:
-                    records_rejected += 1
-                    logger.error("Rejected order_item record: %s", error)
-                    continue
-                order_id = int(row["order_id"])
-                product_id = int(row["product_id"])
-                quantity = int(row["quantity"])
-                unit_price = Decimal(row["unit_price"])
-                try:
-                    cursor.execute(
-                        """
-                        INSERT INTO order_items (
-                            order_id,
-                            product_id,
-                            quantity,
-                            unit_price
+        try:
+            with connection.cursor() as cursor:
+                records_processed = 0
+                records_inserted = 0
+                records_skipped = 0
+                records_rejected = 0
+                for row in reader:
+                    records_processed += 1
+                    try:
+                        validate_order_item(row)
+                    except ValueError as error:
+                        records_rejected += 1
+                        logger.error("Rejected order_item record: %s", error)
+                        continue
+                    order_id = int(row["order_id"])
+                    product_id = int(row["product_id"])
+                    quantity = int(row["quantity"])
+                    unit_price = Decimal(row["unit_price"])
+                    try:
+                        cursor.execute(
+                            """
+                            INSERT INTO order_items (
+                                order_id,
+                                product_id,
+                                quantity,
+                                unit_price
+                            )
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (order_id, product_id) DO NOTHING
+                            """,
+                            (
+                                order_id,
+                                product_id,
+                                quantity,
+                                unit_price
+                            ),
                         )
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (order_id, product_id) DO NOTHING
-                        """,
-                        (
+                    except psycopg.Error:
+                        logger.exception(
+                            "Database error inserting order item: order_id=%s, product_id=%s",
                             order_id,
                             product_id,
-                            quantity,
-                            unit_price
-                        ),
-                    )
-                except psycopg.Error:
-                    logger.exception(
-                        "Database error inserting order item: order_id=%s, product_id=%s",
-                        order_id,
-                        product_id,
-                    )
-                    raise
+                        )
+                        raise
 
-                if cursor.rowcount == 1:
-                    records_inserted += 1
-                else:
-                    records_skipped += 1
-        connection.commit()
+                    if cursor.rowcount == 1:
+                        records_inserted += 1
+                    else:
+                        records_skipped += 1
+            connection.commit()
 
-    except Exception:
-        connection.rollback()
-        raise
+        except Exception:
+            connection.rollback()
+            raise
 
-    finally:
-        connection.close()
+        finally:
+            connection.close()
 
-logger.info(
-    "Order items ingestion completed:\n%s records processed\n%s records inserted\n%s records skipped\n%s records rejected",
-    records_processed,
-    records_inserted,
-    records_skipped,
-    records_rejected,
-)
+    logger.info(
+        "Order items ingestion completed:\n%s records processed\n%s records inserted\n%s records skipped\n%s records rejected",
+        records_processed,
+        records_inserted,
+        records_skipped,
+        records_rejected,
+    )
+
+if __name__ == "__main__":
+    main()
