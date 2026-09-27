@@ -3,12 +3,8 @@ import logging
 from datetime import datetime
 
 import psycopg
-from dotenv import load_dotenv
 from src.ingestion.validation import validate_columns
 from src.ingestion.database import get_connection
-
-
-load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,

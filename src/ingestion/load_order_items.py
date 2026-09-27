@@ -2,13 +2,9 @@ import csv
 import logging
 
 import psycopg
-from dotenv import load_dotenv
 from decimal import Decimal, InvalidOperation
 from src.ingestion.validation import validate_columns
 from src.ingestion.database import get_connection
-
-
-load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
