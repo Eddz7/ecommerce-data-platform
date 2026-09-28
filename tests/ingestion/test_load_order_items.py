@@ -88,7 +88,7 @@ def test_validate_order_item_rejects_negative_unit_price():
 
     with pytest.raises(
         ValueError,
-        match=r"unit_price cannot be negative -10\.00",
+        match=r"unit_price cannot be negative: -10\.00",
     ):
         validate_order_item(row)
 

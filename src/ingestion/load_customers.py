@@ -3,13 +3,10 @@ import logging
 from datetime import datetime
 
 import psycopg
+
 from src.ingestion.validation import validate_columns
 from src.ingestion.database import get_connection
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
@@ -41,21 +38,26 @@ def validate_customer(row):
             )
 
     try:
-        int(row["customer_id"])
+        customer_id = int(row["customer_id"])
     except ValueError:
         raise ValueError(
             f"Invalid customer_id: {row['customer_id']}"
         )
 
     try:
-        datetime.strptime(
+        signup_date = datetime.strptime(
             row["signup_date"],
             "%Y-%m-%d"
-        )
+        ).date()
     except ValueError:
         raise ValueError(
             f"Invalid signup_date: {row['signup_date']}"
         )
+
+    return {
+        "customer_id": customer_id,
+        "signup_date": signup_date,
+    }
 
 
 def main():
@@ -79,7 +81,7 @@ def main():
                     records_processed += 1
 
                     try:
-                        validate_customer(row)
+                        parsed = validate_customer(row)
                     except ValueError as error:
                         records_rejected += 1
                         logger.error(
@@ -88,11 +90,8 @@ def main():
                         )
                         continue
 
-                    customer_id = int(row["customer_id"])
-                    signup_date = datetime.strptime(
-                        row["signup_date"],
-                        "%Y-%m-%d"
-                    ).date()
+                    customer_id = parsed["customer_id"]
+                    signup_date = parsed["signup_date"]
 
                     try:
                         cursor.execute(
@@ -155,11 +154,11 @@ def main():
 
     logger.info(
         "Customers ingestion completed:\n"
-        "%s records processed\n"
-        "%s records inserted\n"
-        "%s records updated\n"
-        "%s records skipped\n"
-        "%s records rejected",
+        "%s record(s) processed\n"
+        "%s record(s) inserted\n"
+        "%s record(s) updated\n"
+        "%s record(s) skipped\n"
+        "%s record(s) rejected",
         records_processed,
         records_inserted,
         records_updated,
@@ -169,4 +168,8 @@ def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
     main()

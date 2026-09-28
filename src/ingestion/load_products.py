@@ -1,16 +1,14 @@
 import csv
 import logging
+from decimal import Decimal, InvalidOperation
 
 import psycopg
-from decimal import Decimal, InvalidOperation
+
 from src.ingestion.validation import validate_columns
 from src.ingestion.database import get_connection
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-)
 logger = logging.getLogger(__name__)
+
 
 EXPECTED_COLUMNS = {
     "product_id",
@@ -18,6 +16,7 @@ EXPECTED_COLUMNS = {
     "category",
     "unit_price",
 }
+
 
 def validate_product(row):
     required_fields = [
@@ -35,7 +34,7 @@ def validate_product(row):
             )
 
     try:
-        int(row["product_id"])
+        product_id = int(row["product_id"])
     except ValueError:
         raise ValueError(
             f"Invalid product_id: {row['product_id']}"
@@ -58,9 +57,13 @@ def validate_product(row):
             f"unit_price cannot be negative: {unit_price}"
         )
 
+    return {
+        "product_id": product_id,
+        "unit_price": unit_price,
+    }
+
 
 def main():
-
     logger.info("Starting product ingestion")
 
     connection = get_connection()
@@ -79,13 +82,13 @@ def main():
                 for row in reader:
                     records_processed += 1
                     try:
-                        validate_product(row)
+                        parsed = validate_product(row)
                     except ValueError as error:
                         records_rejected += 1
                         logger.error("Rejected product record: %s", error)
                         continue
-                    product_id = int(row["product_id"])
-                    unit_price = Decimal(row["unit_price"])
+                    product_id = parsed["product_id"]
+                    unit_price = parsed["unit_price"]
                     try:
                         cursor.execute(
                             """
@@ -136,7 +139,7 @@ def main():
         connection.close()
 
     logger.info(
-        "Products ingestion completed:\n%s records processed\n%s records inserted\n%s records updated\n%s records skipped\n%s records rejected",
+        "Products ingestion completed:\n%s record(s) processed\n%s record(s) inserted\n%s record(s) updated\n%s record(s) skipped\n%s record(s) rejected",
         records_processed,
         records_inserted,
         records_updated,
@@ -144,5 +147,10 @@ def main():
         records_rejected,
     )
 
+
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
     main()

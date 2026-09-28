@@ -1,16 +1,14 @@
 import csv
 import logging
+from decimal import Decimal, InvalidOperation
 
 import psycopg
-from decimal import Decimal, InvalidOperation
+
 from src.ingestion.validation import validate_columns
 from src.ingestion.database import get_connection
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-)
 logger = logging.getLogger(__name__)
+
 
 EXPECTED_COLUMNS = {
     "order_id",
@@ -18,6 +16,7 @@ EXPECTED_COLUMNS = {
     "quantity",
     "unit_price",
 }
+
 
 def validate_order_item(row):
     required_fields = [
@@ -34,14 +33,14 @@ def validate_order_item(row):
                 f"Missing required field: {field}"
             )
     try:
-        int(row["order_id"])
+        order_id = int(row["order_id"])
     except ValueError:
         raise ValueError(
             f"Invalid order_id: {row['order_id']}"
         )
 
     try:
-        int(row["product_id"])
+        product_id = int(row["product_id"])
     except ValueError:
         raise ValueError(
             f"Invalid product_id: {row['product_id']}"
@@ -73,8 +72,16 @@ def validate_order_item(row):
 
     if unit_price < 0:
         raise ValueError(
-            f"unit_price cannot be negative {unit_price}"
+            f"unit_price cannot be negative: {unit_price}"
         )
+
+    return {
+        "order_id": order_id,
+        "product_id": product_id,
+        "quantity": quantity,
+        "unit_price": unit_price,
+    }
+
 
 def main():
     logger.info("Starting order_item ingestion")
@@ -94,15 +101,15 @@ def main():
                 for row in reader:
                     records_processed += 1
                     try:
-                        validate_order_item(row)
+                        parsed = validate_order_item(row)
                     except ValueError as error:
                         records_rejected += 1
                         logger.error("Rejected order_item record: %s", error)
                         continue
-                    order_id = int(row["order_id"])
-                    product_id = int(row["product_id"])
-                    quantity = int(row["quantity"])
-                    unit_price = Decimal(row["unit_price"])
+                    order_id = parsed["order_id"]
+                    product_id = parsed["product_id"]
+                    quantity = parsed["quantity"]
+                    unit_price = parsed["unit_price"]
                     try:
                         cursor.execute(
                             """
@@ -144,12 +151,17 @@ def main():
         connection.close()
 
     logger.info(
-        "Order items ingestion completed:\n%s records processed\n%s records inserted\n%s records skipped\n%s records rejected",
+        "Order items ingestion completed:\n%s record(s) processed\n%s record(s) inserted\n%s record(s) skipped\n%s record(s) rejected",
         records_processed,
         records_inserted,
         records_skipped,
         records_rejected,
     )
 
+
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
     main()
