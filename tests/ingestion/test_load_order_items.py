@@ -93,6 +93,22 @@ def test_validate_order_item_rejects_negative_unit_price():
         validate_order_item(row)
 
 
+def test_validate_order_item_rejects_nan_unit_price():
+    row = valid_order_item()
+    row["unit_price"] = "NaN"
+
+    with pytest.raises(ValueError, match="Invalid unit_price: NaN"):
+        validate_order_item(row)
+
+
+def test_validate_order_item_rejects_infinite_unit_price():
+    row = valid_order_item()
+    row["unit_price"] = "Infinity"
+
+    with pytest.raises(ValueError, match="Invalid unit_price: Infinity"):
+        validate_order_item(row)
+
+
 def test_validate_order_item_rejects_none_field():
     row = valid_order_item()
     row["product_id"] = None

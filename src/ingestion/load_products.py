@@ -48,6 +48,11 @@ def validate_product(row):
             f"Invalid unit_price: {row['unit_price']}"
         )
 
+    if not unit_price.is_finite():
+        raise ValueError(
+            f"Invalid unit_price: {unit_price}"
+        )
+
     if unit_price < 0:
         raise ValueError(
             f"unit_price cannot be negative: {unit_price}"
