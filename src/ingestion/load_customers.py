@@ -71,6 +71,7 @@ def main():
             with connection.cursor() as cursor:
                 records_processed = 0
                 records_inserted = 0
+                records_updated = 0
                 records_skipped = 0
                 records_rejected = 0
 
@@ -105,7 +106,19 @@ def main():
                                 signup_date
                             )
                             VALUES (%s, %s, %s, %s, %s, %s)
-                            ON CONFLICT (customer_id) DO NOTHING
+                            ON CONFLICT (customer_id) DO UPDATE SET
+                                first_name = EXCLUDED.first_name,
+                                last_name = EXCLUDED.last_name,
+                                email = EXCLUDED.email,
+                                country = EXCLUDED.country,
+                                signup_date = EXCLUDED.signup_date
+                            WHERE
+                                customers.first_name IS DISTINCT FROM EXCLUDED.first_name
+                                OR customers.last_name IS DISTINCT FROM EXCLUDED.last_name
+                                OR customers.email IS DISTINCT FROM EXCLUDED.email
+                                OR customers.country IS DISTINCT FROM EXCLUDED.country
+                                OR customers.signup_date IS DISTINCT FROM EXCLUDED.signup_date
+                            RETURNING (xmax = 0) AS inserted
                             """,
                             (
                                 customer_id,
@@ -123,10 +136,13 @@ def main():
                         )
                         raise
 
-                    if cursor.rowcount == 1:
+                    result = cursor.fetchone()
+                    if result is None:
+                        records_skipped += 1
+                    elif result[0]:
                         records_inserted += 1
                     else:
-                        records_skipped += 1
+                        records_updated += 1
 
             connection.commit()
 
@@ -141,10 +157,12 @@ def main():
         "Customers ingestion completed:\n"
         "%s records processed\n"
         "%s records inserted\n"
+        "%s records updated\n"
         "%s records skipped\n"
         "%s records rejected",
         records_processed,
         records_inserted,
+        records_updated,
         records_skipped,
         records_rejected,
     )

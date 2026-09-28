@@ -73,6 +73,7 @@ def main():
             with connection.cursor() as cursor:
                 records_processed = 0
                 records_inserted = 0
+                records_updated = 0
                 records_skipped = 0
                 records_rejected = 0
                 for row in reader:
@@ -95,7 +96,15 @@ def main():
                                 unit_price
                             )
                             VALUES (%s, %s, %s, %s)
-                            ON CONFLICT (product_id) DO NOTHING
+                            ON CONFLICT (product_id) DO UPDATE SET
+                                product_name = EXCLUDED.product_name,
+                                category = EXCLUDED.category,
+                                unit_price = EXCLUDED.unit_price
+                            WHERE
+                                products.product_name IS DISTINCT FROM EXCLUDED.product_name
+                                OR products.category IS DISTINCT FROM EXCLUDED.category
+                                OR products.unit_price IS DISTINCT FROM EXCLUDED.unit_price
+                            RETURNING (xmax = 0) AS inserted
                             """,
                             (
                                 product_id,
@@ -110,10 +119,13 @@ def main():
                             product_id
                         )
                         raise
-                    if cursor.rowcount == 1:
+                    result = cursor.fetchone()
+                    if result is None:
+                        records_skipped += 1
+                    elif result[0]:
                         records_inserted += 1
                     else:
-                        records_skipped += 1
+                        records_updated += 1
             connection.commit()
 
     except Exception:
@@ -124,9 +136,10 @@ def main():
         connection.close()
 
     logger.info(
-        "Products ingestion completed:\n%s records processed\n%s records inserted\n%s records skipped\n%s records rejected",
+        "Products ingestion completed:\n%s records processed\n%s records inserted\n%s records updated\n%s records skipped\n%s records rejected",
         records_processed,
         records_inserted,
+        records_updated,
         records_skipped,
         records_rejected,
     )

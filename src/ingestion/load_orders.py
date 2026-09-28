@@ -92,6 +92,7 @@ def main():
             with connection.cursor() as cursor:
                 records_processed = 0
                 records_inserted = 0
+                records_updated = 0
                 records_skipped = 0
                 records_rejected = 0
                 for row in reader:
@@ -120,7 +121,17 @@ def main():
                                 payment_method
                             )
                             VALUES (%s, %s, %s, %s, %s)
-                            ON CONFLICT (order_id) DO NOTHING
+                            ON CONFLICT (order_id) DO UPDATE SET
+                                customer_id = EXCLUDED.customer_id,
+                                order_date = EXCLUDED.order_date,
+                                status = EXCLUDED.status,
+                                payment_method = EXCLUDED.payment_method
+                            WHERE
+                                orders.customer_id IS DISTINCT FROM EXCLUDED.customer_id
+                                OR orders.order_date IS DISTINCT FROM EXCLUDED.order_date
+                                OR orders.status IS DISTINCT FROM EXCLUDED.status
+                                OR orders.payment_method IS DISTINCT FROM EXCLUDED.payment_method
+                            RETURNING (xmax = 0) AS inserted
                             """,
                             (
                                 order_id,
@@ -138,10 +149,13 @@ def main():
                         )
                         raise
 
-                    if cursor.rowcount == 1:
+                    result = cursor.fetchone()
+                    if result is None:
+                        records_skipped += 1
+                    elif result[0]:
                         records_inserted += 1
                     else:
-                        records_skipped += 1
+                        records_updated += 1
             connection.commit()
 
     except Exception:
@@ -152,9 +166,10 @@ def main():
         connection.close()
 
     logger.info(
-        "Orders ingestion completed:\n%s records processed\n%s records inserted\n%s records skipped\n%s records rejected",
+        "Orders ingestion completed:\n%s records processed\n%s records inserted\n%s records updated\n%s records skipped\n%s records rejected",
         records_processed,
         records_inserted,
+        records_updated,
         records_skipped,
         records_rejected,
     )
