@@ -27,7 +27,7 @@ EXPECTED_COLUMNS = {
 }
 
 
-def validate_order(row):
+def validate_order(row, valid_customer_ids):
     required_fields = [
         "order_id",
         "customer_id",
@@ -55,6 +55,11 @@ def validate_order(row):
     except ValueError:
         raise ValueError(
             f"Invalid customer_id: {row['customer_id']}"
+        )
+
+    if customer_id not in valid_customer_ids:
+        raise ValueError(
+            f"Customer does not exist: customer_id={customer_id}"
         )
 
     try:
@@ -95,6 +100,9 @@ def main():
             validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
 
             with connection.cursor() as cursor:
+                cursor.execute("SELECT customer_id FROM customers")
+                valid_customer_ids = {record[0] for record in cursor.fetchall()}
+
                 records_processed = 0
                 records_inserted = 0
                 records_updated = 0
@@ -103,7 +111,7 @@ def main():
                 for row in reader:
                     records_processed += 1
                     try:
-                        parsed = validate_order(row)
+                        parsed = validate_order(row, valid_customer_ids)
                     except ValueError as error:
                         records_rejected += 1
                         logger.error("Rejected order record: %s", error)

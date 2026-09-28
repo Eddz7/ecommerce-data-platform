@@ -3,6 +3,8 @@ import pytest
 from src.ingestion import load_orders
 from src.ingestion.load_orders import validate_order
 
+VALID_CUSTOMER_IDS = {101}
+
 
 def valid_order():
     return {
@@ -15,7 +17,7 @@ def valid_order():
 
 
 def test_validate_order_accepts_valid_record():
-    validate_order(valid_order())
+    validate_order(valid_order(), VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_missing_required_field():
@@ -23,7 +25,7 @@ def test_validate_order_rejects_missing_required_field():
     row["status"] = ""
 
     with pytest.raises(ValueError, match="Missing required field: status"):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_invalid_order_id():
@@ -31,7 +33,7 @@ def test_validate_order_rejects_invalid_order_id():
     row["order_id"] = "abc"
 
     with pytest.raises(ValueError, match="Invalid order_id: abc"):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_invalid_customer_id():
@@ -39,7 +41,18 @@ def test_validate_order_rejects_invalid_customer_id():
     row["customer_id"] = "abc"
 
     with pytest.raises(ValueError, match="Invalid customer_id: abc"):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
+
+
+def test_validate_order_rejects_nonexistent_customer():
+    row = valid_order()
+    row["customer_id"] = "9999"
+
+    with pytest.raises(
+        ValueError,
+        match="Customer does not exist: customer_id=9999",
+    ):
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_invalid_order_date():
@@ -47,7 +60,7 @@ def test_validate_order_rejects_invalid_order_date():
     row["order_date"] = "15-01-2026"
 
     with pytest.raises(ValueError, match="Invalid order_date: 15-01-2026"):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_invalid_status():
@@ -55,7 +68,7 @@ def test_validate_order_rejects_invalid_status():
     row["status"] = "pending"
 
     with pytest.raises(ValueError, match="Invalid status: pending"):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_invalid_payment_method():
@@ -66,7 +79,7 @@ def test_validate_order_rejects_invalid_payment_method():
         ValueError,
         match="Invalid payment_method: cash",
     ):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_none_field():
@@ -74,7 +87,7 @@ def test_validate_order_rejects_none_field():
     row["status"] = None
 
     with pytest.raises(ValueError, match="Missing required field: status"):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_validate_order_rejects_whitespace_only_field():
@@ -82,7 +95,7 @@ def test_validate_order_rejects_whitespace_only_field():
     row["status"] = "   "
 
     with pytest.raises(ValueError, match="Missing required field: status"):
-        validate_order(row)
+        validate_order(row, VALID_CUSTOMER_IDS)
 
 
 def test_main_closes_connection_when_columns_are_invalid(
