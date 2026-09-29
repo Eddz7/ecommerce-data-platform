@@ -18,7 +18,7 @@ EXPECTED_COLUMNS = {
 }
 
 
-def validate_order_item(row):
+def validate_order_item(row, valid_order_ids, valid_product_ids):
     required_fields = [
         "order_id",
         "product_id",
@@ -38,12 +38,20 @@ def validate_order_item(row):
         raise ValueError(
             f"Invalid order_id: {row['order_id']}"
         )
+    if order_id not in valid_order_ids:
+        raise ValueError(
+            f"Order does not exist: order_id={order_id}"
+        )
 
     try:
         product_id = int(row["product_id"])
     except ValueError:
         raise ValueError(
             f"Invalid product_id: {row['product_id']}"
+        )
+    if product_id not in valid_product_ids:
+        raise ValueError(
+            f"Product does not exist: product_id={product_id}"
         )
 
     try:
@@ -94,6 +102,11 @@ def main():
             validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
 
             with connection.cursor() as cursor:
+                cursor.execute("SELECT order_id FROM orders")
+                valid_order_ids = {record[0] for record in cursor.fetchall()}
+                cursor.execute("SELECT product_id FROM products")
+                valid_product_ids = {record[0] for record in cursor.fetchall()}
+
                 records_processed = 0
                 records_inserted = 0
                 records_skipped = 0
@@ -101,7 +114,7 @@ def main():
                 for row in reader:
                     records_processed += 1
                     try:
-                        parsed = validate_order_item(row)
+                        parsed = validate_order_item(row, valid_order_ids, valid_product_ids)
                     except ValueError as error:
                         records_rejected += 1
                         logger.error("Rejected order_item record: %s", error)

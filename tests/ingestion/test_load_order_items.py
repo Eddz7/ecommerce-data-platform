@@ -3,6 +3,9 @@ import pytest
 from src.ingestion import load_order_items
 from src.ingestion.load_order_items import validate_order_item
 
+VALID_ORDER_IDS = {1001}
+VALID_PRODUCT_IDS = {501}
+
 
 def valid_order_item():
     return {
@@ -14,7 +17,7 @@ def valid_order_item():
 
 
 def test_validate_order_item_accepts_valid_record():
-    validate_order_item(valid_order_item())
+    validate_order_item(valid_order_item(), VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_missing_required_field():
@@ -25,7 +28,7 @@ def test_validate_order_item_rejects_missing_required_field():
         ValueError,
         match="Missing required field: product_id",
     ):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_invalid_order_id():
@@ -33,7 +36,18 @@ def test_validate_order_item_rejects_invalid_order_id():
     row["order_id"] = "abc"
 
     with pytest.raises(ValueError, match="Invalid order_id: abc"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
+
+
+def test_validate_order_item_rejects_nonexistent_order():
+    row = valid_order_item()
+    row["order_id"] = "9999"
+
+    with pytest.raises(
+        ValueError,
+        match="Order does not exist: order_id=9999",
+    ):
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_invalid_product_id():
@@ -41,7 +55,18 @@ def test_validate_order_item_rejects_invalid_product_id():
     row["product_id"] = "abc"
 
     with pytest.raises(ValueError, match="Invalid product_id: abc"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
+
+
+def test_validate_order_item_rejects_nonexistent_product():
+    row = valid_order_item()
+    row["product_id"] = "9999"
+
+    with pytest.raises(
+        ValueError,
+        match="Product does not exist: product_id=9999",
+    ):
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_invalid_quantity():
@@ -49,7 +74,7 @@ def test_validate_order_item_rejects_invalid_quantity():
     row["quantity"] = "abc"
 
     with pytest.raises(ValueError, match="Invalid quantity: abc"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_zero_quantity():
@@ -60,7 +85,7 @@ def test_validate_order_item_rejects_zero_quantity():
         ValueError,
         match=r"quantity must be greater than zero: 0",
     ):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_negative_quantity():
@@ -71,7 +96,7 @@ def test_validate_order_item_rejects_negative_quantity():
         ValueError,
         match=r"quantity must be greater than zero: -1",
     ):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_invalid_unit_price():
@@ -79,7 +104,7 @@ def test_validate_order_item_rejects_invalid_unit_price():
     row["unit_price"] = "abc"
 
     with pytest.raises(ValueError, match="Invalid unit_price: abc"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_negative_unit_price():
@@ -90,7 +115,7 @@ def test_validate_order_item_rejects_negative_unit_price():
         ValueError,
         match=r"unit_price cannot be negative: -10\.00",
     ):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_nan_unit_price():
@@ -98,7 +123,7 @@ def test_validate_order_item_rejects_nan_unit_price():
     row["unit_price"] = "NaN"
 
     with pytest.raises(ValueError, match="Invalid unit_price: NaN"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_infinite_unit_price():
@@ -106,7 +131,7 @@ def test_validate_order_item_rejects_infinite_unit_price():
     row["unit_price"] = "Infinity"
 
     with pytest.raises(ValueError, match="Invalid unit_price: Infinity"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_none_field():
@@ -114,7 +139,7 @@ def test_validate_order_item_rejects_none_field():
     row["product_id"] = None
 
     with pytest.raises(ValueError, match="Missing required field: product_id"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_validate_order_item_rejects_whitespace_only_field():
@@ -122,7 +147,7 @@ def test_validate_order_item_rejects_whitespace_only_field():
     row["product_id"] = "   "
 
     with pytest.raises(ValueError, match="Missing required field: product_id"):
-        validate_order_item(row)
+        validate_order_item(row, VALID_ORDER_IDS, VALID_PRODUCT_IDS)
 
 
 def test_main_closes_connection_when_columns_are_invalid(
