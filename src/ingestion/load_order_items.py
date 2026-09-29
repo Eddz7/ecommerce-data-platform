@@ -3,6 +3,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from src.ingestion.validation import validate_columns
 from src.ingestion.database import get_connection
@@ -118,6 +119,13 @@ def main():
                     except ValueError as error:
                         records_rejected += 1
                         logger.error("Rejected order_item record: %s", error)
+                        cursor.execute(
+                            """
+                            INSERT INTO rejected_records (source_table, raw_data, rejection_reason)
+                            VALUES (%s, %s, %s)
+                            """,
+                            ("order_items", Jsonb(row), str(error)),
+                        )
                         continue
                     order_id = parsed["order_id"]
                     product_id = parsed["product_id"]
