@@ -20,7 +20,7 @@ EXPECTED_COLUMNS = {
 }
 
 
-def validate_customer(row):
+def validate_customer(row, email_to_customer_id):
     required_fields = [
         "customer_id",
         "first_name",
@@ -42,6 +42,11 @@ def validate_customer(row):
     except ValueError:
         raise ValueError(
             f"Invalid customer_id: {row['customer_id']}"
+        )
+    existing_customer_id = email_to_customer_id.get(row["email"])
+    if existing_customer_id is not None and existing_customer_id != customer_id:
+        raise ValueError(
+            f"Email already belongs to another customer: {row['email']}"
         )
 
     try:
@@ -71,6 +76,9 @@ def main():
             validate_columns(reader.fieldnames, EXPECTED_COLUMNS)
 
             with connection.cursor() as cursor:
+                cursor.execute("SELECT customer_id, email FROM customers")
+                email_to_customer_id = {email: customer_id for customer_id, email in cursor.fetchall()}
+
                 records_processed = 0
                 records_inserted = 0
                 records_updated = 0
@@ -81,7 +89,7 @@ def main():
                     records_processed += 1
 
                     try:
-                        parsed = validate_customer(row)
+                        parsed = validate_customer(row, email_to_customer_id)
                     except ValueError as error:
                         records_rejected += 1
                         logger.error(
