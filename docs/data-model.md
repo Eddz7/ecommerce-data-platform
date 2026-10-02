@@ -49,6 +49,22 @@
 | quantity | Number of units purchased |
 | unit_price | Price per unit at time of purchase |
 
+## Data Quality Tables
+
+### rejected_records
+
+**Grain:** One row per rejected ingestion record (an event, not an entity).
+
+| Column | Description |
+|---|---|
+| id | Surrogate key (auto-incrementing) |
+| source_table | Loader the record came from (customers, products, orders, order_items) |
+| raw_data | The original CSV row, stored as JSONB |
+| rejection_reason | Why the record failed validation |
+| rejected_at | When the record was rejected (timezone-aware) |
+
+Rejections are never deduplicated: each rejection is its own event. The table has no foreign keys, because a rejected row may reference things that do not exist, which can be the reason it was rejected.
+
 ## Relationships
 
 - One customer can have many orders.
